@@ -634,30 +634,29 @@
                 return;
             }
 
-            const certificateFileName = `${studentId}_${certificateFile.name}`;
+            const formData = new FormData();
+            formData.append('studentId', studentId);
+            formData.append('studentName', studentName);
+            formData.append('phone', phone);
+            formData.append('certificateFile', certificateFile);
 
             try {
-                const response = await fetch('/api/students', {
+                const response = await fetch('/api/students/upload', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        id: studentId,
-                        name: studentName,
-                        phone: phone,
-                        certificateFile: certificateFileName
-                    })
+                    body: formData
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
-                    showMessage('Student added successfully! ✅', 'success');
+                    showMessage('Student and certificate uploaded successfully! ✅', 'success');
                     studentForm.reset();
                     loadStudents();
                 } else {
                     showMessage(data.message || 'Error saving student', 'error');
                 }
             } catch (error) {
+                console.error('Error:', error);
                 showMessage('An error occurred', 'error');
             }
         });
@@ -701,7 +700,7 @@
                             <td>${student.name}</td>
                             <td>${student.phone}</td>
                             <td>${student.certificateFile || '-'}</td>
-                            <td><button class="btn-danger" onclick="deleteStudent('${student.id}')">Delete</button></td>
+                            <td><button class="btn-danger delete-btn" data-student-id="${student.id}">Delete</button></td>
                         </tr>
                     `).join('');
                 } else {
@@ -711,6 +710,14 @@
                 showMessage('Error loading students', 'error');
             }
         }
+
+        // Event delegation for delete buttons
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('delete-btn')) {
+                const studentId = e.target.getAttribute('data-student-id');
+                deleteStudent(studentId);
+            }
+        });
 
         function showMessage(text, type) {
             messageDiv.textContent = text;
@@ -724,7 +731,23 @@
 
         function deleteStudent(studentId) {
             if (confirm('Are you sure you want to delete this student record?')) {
-                alert('Delete functionality requires a DELETE endpoint on the server');
+                fetch(`/api/students/${studentId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showMessage('Student deleted successfully ✅', 'success');
+                        loadStudents();
+                    } else {
+                        showMessage(data.message || 'Error deleting student', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showMessage('An error occurred while deleting', 'error');
+                });
             }
         }
 

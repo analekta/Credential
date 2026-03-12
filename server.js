@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import session from 'express-session';
+import multer from 'multer';
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -53,6 +54,30 @@ const certificatesDir = path.join(__dirname, 'certificates');
 if (!fs.existsSync(certificatesDir)) {
   fs.mkdirSync(certificatesDir, { recursive: true });
 }
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, certificatesDir);
+    },
+    filename: (req, file, cb) => {
+      const studentId = req.body.studentId;
+      const originalName = file.originalname;
+      const filename = `${studentId}_${originalName}`;
+      cb(null, filename);
+    }
+  }),
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype !== 'application/pdf') {
+      return cb(new Error('Only PDF files are allowed'));
+    }
+    cb(null, true);
+  },
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB limit
+  }
+});
 
 // Ensure students.json exists
 if (!fs.existsSync(studentsFile)) {
@@ -194,11 +219,74 @@ app.post('/api/students', isAuthenticated, (req, res) => {
   }
 });
 
+// API endpoint: Add student with file upload
+app.post('/api/students/upload', isAuthenticated, upload.single('certificateFile'), (req, res) => {
+  try {
+    const { studentId, studentName, phone } = req.body;
+
+    if (!studentId || !studentName || !phone) {
+      return res.status(400).json({ success: false, message: 'Student ID, name, and phone are required' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Certificate file is required' });
+    }
+
+    const certificateFileName = req.file.filename;
+
+    const students = loadStudents();
+    const studentIndex = students.findIndex(s => s.id === studentId);
+
+    if (studentIndex >= 0) {
+      // Update existing student
+      students[studentIndex] = { id: studentId, name: studentName, phone, certificateFile: certificateFileName };
+    } else {
+      // Add new student
+      students.push({ id: studentId, name: studentName, phone, certificateFile: certificateFileName });
+    }
+
+    saveStudents(students);
+    res.json({ success: true, message: 'Student and certificate uploaded successfully.' });
+  } catch (error) {
+    console.error('Error:', error);
+    if (error.message === 'Only PDF files are allowed') {
+      return res.status(400).json({ success: false, message: 'Only PDF files are allowed' });
+    }
+    res.status(500).json({ success: false, message: 'Server error occurred.' });
+  }
+});
+
 // API endpoint: Get all students (for admin purposes)
 app.get('/api/students', isAuthenticated, (req, res) => {
   try {
     const students = loadStudents();
     res.json({ success: true, data: students, total: students.length });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ success: false, message: 'Server error occurred.' });
+  }
+});
+
+// API endpoint: Delete student
+app.delete('/api/students/:id', isAuthenticated, (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ success: false, message: 'Student ID is required' });
+    }
+
+    const students = loadStudents();
+    const studentIndex = students.findIndex(s => s.id === id);
+
+    if (studentIndex < 0) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    students.splice(studentIndex, 1);
+    saveStudents(students);
+
+    res.json({ success: true, message: 'Student deleted successfully.' });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ success: false, message: 'Server error occurred.' });

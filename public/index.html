@@ -113,8 +113,21 @@
             background: rgba(15, 23, 42, 1);
         }
 
-        input::placeholder {
-            color: rgba(203, 213, 225, 0.5);
+        input[type="text"].invalid,
+        input[type="tel"].invalid {
+            border-color: var(--error);
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+        }
+
+        .char-count {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            display: none;
+        }
+
+        .char-count.show {
+            display: block;
         }
 
         .button-group {
@@ -301,8 +314,10 @@
                     type="text"
                     id="studentId"
                     placeholder="e.g., STU001"
+                    maxlength="50"
                     required
                 >
+                <div class="char-count"><span id="studentIdCount">0</span>/50</div>
             </div>
 
             <div class="form-group">
@@ -311,14 +326,16 @@
                     type="tel"
                     id="phone"
                     placeholder="e.g., +1234567890"
+                    maxlength="20"
                     required
                 >
+                <div class="char-count"><span id="phoneCount">0</span>/20</div>
             </div>
 
             <div class="button-group">
                 <button type="submit" class="btn-download">Download Certificate</button>
                 <button type="reset" class="btn-reset">Clear</button>
-                
+
             </div>
         </form>
 
@@ -338,15 +355,72 @@
         const form = document.getElementById('certificateForm');
         const message = document.getElementById('message');
         const loading = document.getElementById('loading');
+        const studentIdInput = document.getElementById('studentId');
+        const phoneInput = document.getElementById('phone');
+        const studentIdCount = document.getElementById('studentIdCount');
+        const phoneCount = document.getElementById('phoneCount');
+
+        // Real-time character counter and input validation
+        studentIdInput.addEventListener('input', (e) => {
+            const length = e.target.value.length;
+            studentIdCount.textContent = length;
+
+            // Show counter when typing
+            if (length > 0) {
+                studentIdInput.nextElementSibling.classList.add('show');
+            } else {
+                studentIdInput.nextElementSibling.classList.remove('show');
+            }
+        });
+
+        phoneInput.addEventListener('input', (e) => {
+            const length = e.target.value.length;
+            phoneCount.textContent = length;
+
+            // Show counter when typing
+            if (length > 0) {
+                phoneInput.nextElementSibling.classList.add('show');
+            } else {
+                phoneInput.nextElementSibling.classList.remove('show');
+            }
+        });
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const studentId = document.getElementById('studentId').value.trim();
-            const phone = document.getElementById('phone').value.trim();
+            const studentId = studentIdInput.value.trim();
+            const phone = phoneInput.value.trim();
 
+            // Clear previous error styling
+            studentIdInput.classList.remove('invalid');
+            phoneInput.classList.remove('invalid');
+
+            // Validation
             if (!studentId || !phone) {
                 showMessage('Please fill in all fields', 'error');
+                if (!studentId) studentIdInput.classList.add('invalid');
+                if (!phone) phoneInput.classList.add('invalid');
+                return;
+            }
+
+            // Validate student ID length
+            if (studentId.length > 50) {
+                showMessage('Student ID is too long (max 50 characters)', 'error');
+                studentIdInput.classList.add('invalid');
+                return;
+            }
+
+            // Validate phone length
+            if (phone.length > 20) {
+                showMessage('Phone number is too long (max 20 characters)', 'error');
+                phoneInput.classList.add('invalid');
+                return;
+            }
+
+            // Basic phone validation (should contain numbers)
+            if (!/\d/.test(phone)) {
+                showMessage('Phone number must contain at least one digit', 'error');
+                phoneInput.classList.add('invalid');
                 return;
             }
 
@@ -387,9 +461,19 @@
 
                     showMessage('Certificate downloaded successfully! 🎉', 'success');
                     form.reset();
+                    studentIdCount.textContent = '0';
+                    phoneCount.textContent = '0';
+                    studentIdInput.nextElementSibling.classList.remove('show');
+                    phoneInput.nextElementSibling.classList.remove('show');
                 } else {
                     const errorData = await response.json();
                     showMessage(errorData.message || 'Error downloading certificate', 'error');
+
+                    // Highlight invalid fields if student not found
+                    if (response.status === 404) {
+                        studentIdInput.classList.add('invalid');
+                        phoneInput.classList.add('invalid');
+                    }
                 }
             } catch (error) {
                 loading.style.display = 'none';
