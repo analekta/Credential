@@ -14,4 +14,4 @@ jobs:
         run: |
           echo "Pinging Render service..."
           curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" https://credential-i2ym.onrender.com
-          curl -s https://credential-i2ym.onrender.com/admin
+          curl -s https://credential-i2ym.onrender.com/admin.html
