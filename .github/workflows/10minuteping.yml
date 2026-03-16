@@ -1,14 +1,19 @@
-name: 10minute render ping
+name: Render Keep Alive
 
 on:
-  schedule:
-    - cron: '*/10 * * * *'  # Runs daily at midnight UTC
-  workflow_dispatch:  # Allows manual triggering
+schedule:
+- cron: "*/10 * * * *"   # every 10 minutes
+workflow_dispatch:
 
 jobs:
-  curl-website:
-    runs-on: ubuntu-latest
+ping:
+runs-on: ubuntu-latest
 
-    steps:
-      - name: Run cURL on Website
-        run: curl -I https://credential-i2ym.onrender.com
+```
+steps:
+  - name: Ping Render App
+    run: |
+      echo "Pinging Render service..."
+      curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" https://credential-i2ym.onrender.com
+      curl -s https://credential-i2ym.onrender.com/admin
+```
